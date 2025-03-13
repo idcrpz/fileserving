@@ -7,7 +7,34 @@ const formidable = require('formidable'); // Import the formidable module
 // Create the server
 const server = http.createServer((req, res) => {
 
-    // Serve static files (index.html) for other routes
+    // Serve static files (CSS, JS, images, etc.) from the "public" folder
+    if (req.method === 'GET' && req.url.startsWith('/public')) {
+        const filePath = path.join(__dirname, req.url);
+        fs.readFile(filePath, (err, content) => {
+            if (err) {
+                res.writeHead(404, { 'Content-Type': 'text/html' });
+                res.end("<h1>404 - File Not Found</h1>", 'utf8');
+                return;
+            }
+
+            const ext = path.extname(filePath).toLowerCase();
+            let contentType = 'text/plain';
+
+            if (ext === '.css') {
+                contentType = 'text/css';
+            } else if (ext === '.js') {
+                contentType = 'application/javascript';
+            } else if (ext === '.html') {
+                contentType = 'text/html';
+            }
+
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(content, 'utf8');
+        });
+        return;
+    }
+
+    // Serve the index page for GET requests to the root
     if (req.method === 'GET') {
         let filePath = path.join(__dirname, 'public', req.url === '/' ? 'index.html' : req.url);
 
@@ -32,12 +59,10 @@ const server = http.createServer((req, res) => {
 
     // Handle file uploads
     else if (req.method === 'POST' && req.url === '/upload') {
-        // Create a new formidable instance
         const form = new formidable.IncomingForm();
-        form.uploadDir = path.join(__dirname, 'uploads'); // Specify the upload directory
-        form.keepExtensions = true; // Retain file extensions
+        form.uploadDir = path.join(__dirname, 'uploads');
+        form.keepExtensions = true;
 
-        // Parse the incoming request and handle the file upload
         form.parse(req, (err, fields, files) => {
             if (err) {
                 res.writeHead(400, { 'Content-Type': 'text/html' });
@@ -45,28 +70,25 @@ const server = http.createServer((req, res) => {
                 return;
             }
 
-            // Validate file type
-            const file = files.file[0];  // Access the uploaded file
+            const file = files.file[0];
             const mimeType = mime.lookup(file.name);
 
-            const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf']; // Example allowed types
+            const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+
             if (!allowedTypes.includes(mimeType)) {
-                fs.unlinkSync(file.filepath); // Remove the invalid file
+                fs.unlinkSync(file.filepath);
                 res.writeHead(415, { 'Content-Type': 'text/html' });
                 res.end("<h1>415 - Unsupported File Type</h1>", 'utf8');
                 return;
             }
 
-            // Successfully uploaded
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end("<h1>File Uploaded Successfully!</h1>", 'utf8');
         });
     } else {
-        // For other routes, show a 404 error
         res.writeHead(404, { 'Content-Type': 'text/html' });
         res.end("<h1>404 - Not Found</h1>", 'utf8');
     }
-
 });
 
 // Set the port and start the server
